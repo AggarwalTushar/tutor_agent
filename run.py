@@ -2,7 +2,7 @@ import os
 import re
 import requests
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 
@@ -185,8 +185,8 @@ def handle_query():
     return jsonify({'response': response_text, 'history': history})
 
 @app.route('/')
-def index():
-    return "AI Tutor Agent (Enhanced) is running. Use the /query endpoint."
+def serve_index():
+    return send_from_directory('public', 'index.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 3000)) 
