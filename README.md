@@ -45,18 +45,18 @@ First, set up and run the Flask server.
 
 ```bash
 # 1. Clone the repository (or download the files)
-git clone <your-repository-url>
-cd <your-repository-directory>
+git clone https://github.com/AggarwalTushar/tutor_agent.git
+cd tutor_agent
 
 # 2. Install the required Python packages
 pip install -r requirements.txt
 
 # 3. Set your Gemini API key as an environment variable
 # On macOS/Linux:
-export GEMINI_API_KEY="YOUR_API_KEY_HERE"
+export API_KEY="YOUR_API_KEY_HERE"
 
 # On Windows (Command Prompt):
-set GEMINI_API_KEY="YOUR_API_KEY_HERE"
+set API_KEY="YOUR_API_KEY_HERE"
 
 # 4. Run the Flask server
-flask run --port 5001
+python run.py
