@@ -5,17 +5,16 @@ import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-
 app = Flask(__name__)
-CORS(app) 
+CORS(app)
 
-GEMINI_API_KEY = os.getenv("API_KEY")
+GEMINI_API_KEY = os.environ.get('API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
 
 # --- Gemini API Call ---
 def call_gemini_api(prompt, conversation_history=None):
     if not GEMINI_API_KEY:
-        return "Error: GEMINI_API_KEY is not set. Please set the environment variable."
+        return "Error: GEMINI_API_KEY environment variable is not set."
 
     contents = []
     if conversation_history:
@@ -36,8 +35,7 @@ def call_gemini_api(prompt, conversation_history=None):
         if candidates and 'content' in candidates[0] and 'parts' in candidates[0]['content']:
             return candidates[0]['content']['parts'][0].get('text', "Sorry, I couldn't generate a response.").strip()
         
-        return "Sorry, the response from the API was not in the expected format."
-        
+        return "Sorry, the API response was not in the expected format."
     except requests.exceptions.RequestException as e:
         print(f"Error calling Gemini API: {e}")
         return "Error: Could not connect to the Gemini API."
@@ -51,9 +49,9 @@ def calculator_tool(expression: str) -> str:
     expression = "".join(filter(lambda char: char in "0123456789.+-*/() ", expression))
     try:
         result = eval(expression, {"__builtins__": None}, {})
-        return f"The result of the calculation `{expression}` is {result}."
+        return f"The result of `{expression}` is **{result}**."
     except Exception as e:
-        return f"I encountered an error trying to calculate that: {e}. Please ensure it's a valid mathematical expression."
+        return f"I encountered an error trying to calculate that: {e}."
 
 def physics_constants_tool(constant_name: str) -> str | None:
     constants = {
@@ -64,87 +62,81 @@ def physics_constants_tool(constant_name: str) -> str | None:
     }
     for key in constants:
         if key in constant_name.lower():
-            return f"The value of {key} is {constants[key]}."
+            return f"The value of **{key}** is `{constants[key]}`."
     return None
+
+def code_generator_tool(task_description: str) -> str:
+    print(f"Code Generator Tool activated for: {task_description}")
+    code_prompt = f"""
+    You are a helpful code assistant.
+    Generate a clean, well-commented Python code snippet for the following task.
+    Do not include any explanation outside of the code block.
+    Task: "{task_description}"
+    """
+    generated_code = call_gemini_api(code_prompt)
+    return f"Certainly! Here is a Python script for '{task_description}':\n\n{generated_code}"
 
 # --- AGENT DEFINITIONS ---
 
 def math_agent(query: str, history: list) -> str:
-    """Specializes in math questions, deciding when to use its calculator tool."""
     print("Delegating to Math Agent...")
-    
-    # Ask the LLM if the calculator tool is needed for the latest query
-    tool_prompt = f"""
-    Conversation History:
-    {json.dumps(history, indent=2)}
-
-    User's latest query: "{query}"
-
-    Based on the user's latest query, do you need to use the calculator tool? 
-    The calculator can evaluate mathematical expressions (e.g., "5*10", "100 / 4").
-    Respond with a JSON object containing two keys:
-    1. "use_tool": boolean (true if the calculator is needed, otherwise false)
-    2. "expression": string (the mathematical expression to calculate, or an empty string if not using the tool)
-    
-    Example for 'what is 25 * 4?': {{"use_tool": true, "expression": "25 * 4"}}
-    Example for 'what is a prime number?': {{"use_tool": false, "expression": ""}}
+    tool_prompt = f"""Based on the user's latest query, do they need to perform a calculation?
+    Query: "{query}"
+    Respond with a JSON object: {{"use_tool": boolean, "expression": "the calculation or empty string"}}
     """
-    
     try:
-        tool_decision_str = call_gemini_api(tool_prompt)
-        tool_decision = json.loads(tool_decision_str)
-        
-        if tool_decision.get("use_tool"):
-            print(f"Math Agent decided to use the calculator for: {tool_decision.get('expression')}")
-            return calculator_tool(tool_decision.get("expression"))
+        decision_str = call_gemini_api(tool_prompt)
+        decision = json.loads(decision_str)
+        if decision.get("use_tool"):
+            return calculator_tool(decision.get("expression"))
     except (json.JSONDecodeError, KeyError) as e:
-        print(f"Math Agent could not parse tool decision: {e}. Proceeding without tool.")
-
-    print("Math Agent is generating a conversational response.")
-    concept_prompt = f"You are a friendly and helpful math tutor. Answer the user's question clearly and concisely."
+        print(f"Math Agent could not parse tool decision: {e}.")
+    
+    concept_prompt = f"You are a friendly math tutor. Answer the user's question clearly. Use Markdown for formatting (e.g., lists, bold text)."
     return call_gemini_api(concept_prompt, history + [{"sender": "user", "text": query}])
+
 
 def physics_agent(query: str, history: list) -> str:
-    """Specializes in physics questions, deciding when to look up a constant."""
     print("Delegating to Physics Agent...")
-
-    # Ask the LLM if the constants tool is needed
-    tool_prompt = f"""
-    Conversation History:
-    {json.dumps(history, indent=2)}
-
-    User's latest query: "{query}"
-    
-    Based on the query, do you need to look up a physical constant (e.g., speed of light, gravity)?
-    Respond with a JSON object containing two keys:
-    1. "use_tool": boolean (true if a constant lookup is needed, otherwise false)
-    2. "constant_name": string (the name of the constant, or an empty string if not using the tool)
+    tool_prompt = f"""Based on the query, do they need a physical constant?
+    Query: "{query}"
+    Respond with a JSON object: {{"use_tool": boolean, "constant_name": "the constant or empty string"}}
     """
-
     try:
-        tool_decision_str = call_gemini_api(tool_prompt)
-        tool_decision = json.loads(tool_decision_str)
-
-        if tool_decision.get("use_tool"):
-            constant_name = tool_decision.get("constant_name")
-            print(f"Physics Agent decided to look up constant: {constant_name}")
-            result = physics_constants_tool(constant_name)
-            if result:
-                return result
+        decision_str = call_gemini_api(tool_prompt)
+        decision = json.loads(decision_str)
+        if decision.get("use_tool"):
+            result = physics_constants_tool(decision.get("constant_name"))
+            if result: return result
     except (json.JSONDecodeError, KeyError) as e:
-        print(f"Physics Agent could not parse tool decision: {e}. Proceeding without tool.")
-    
-    print("Physics Agent is generating a conversational response.")
-    concept_prompt = "You are a friendly and helpful physics tutor. Answer the user's question clearly and concisely."
+        print(f"Physics Agent could not parse tool decision: {e}.")
+
+    concept_prompt = "You are a helpful physics tutor. Answer clearly. Use Markdown for formatting."
     return call_gemini_api(concept_prompt, history + [{"sender": "user", "text": query}])
 
+
+def general_knowledge_agent(query: str, history: list) -> str:
+    print("Delegating to General Knowledge Agent...")
+    tool_prompt = f"""Analyze the user's query. Does it ask for a Python script or code?
+    Query: "{query}"
+    Respond with JSON: {{"use_tool": boolean, "task_description": "the task or empty string"}}
+    """
+    try:
+        decision_str = call_gemini_api(tool_prompt)
+        decision = json.loads(decision_str)
+        if decision.get("use_tool"):
+            return code_generator_tool(decision.get("task_description"))
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"General Agent could not parse tool decision: {e}.")
+
+    concept_prompt = "You are a helpful general assistant. Answer the user's question. Use Markdown for formatting."
+    return call_gemini_api(concept_prompt, history + [{"sender": "user", "text": query}])
+
+
 def tutor_agent(query: str, history: list) -> str:
-    """The main agent that determines intent and delegates to the specialist agents."""
     print("Tutor Agent received query...")
-    
     intent_prompt = f"""
-    You are an AI Tutor orchestrator. Your job is to classify the user's query and route it to the correct specialist.
-    Based on the conversation so far and the latest query, classify the subject.
+    Analyze the user's query and classify its primary subject based on the conversation.
     
     Conversation History:
     {json.dumps(history, indent=2)}
@@ -154,7 +146,7 @@ def tutor_agent(query: str, history: list) -> str:
     Respond with a single word: 'math', 'physics', or 'general'.
     Classification:"""
     
-    intent = call_gemini_api(intent_prompt).lower().strip().replace("'", "")
+    intent = call_gemini_api(intent_prompt).lower().strip().replace("'", "").replace(".", "")
     print(f"Tutor Agent classified intent as: '{intent}'")
 
     if 'math' in intent:
@@ -162,15 +154,13 @@ def tutor_agent(query: str, history: list) -> str:
     elif 'physics' in intent:
         return physics_agent(query, history)
     else:
-        return "I'm sorry, I specialize in math and physics. Could you ask a question on one of those subjects?"
+        return general_knowledge_agent(query, history)
 
 # --- FLASK ROUTE ---
 
 @app.route('/query', methods=['POST'])
 def handle_query():
-    """Endpoint to receive user queries and conversation history."""
     data = request.get_json()
-    
     if not data or 'query' not in data:
         return jsonify({'error': 'No query provided.'}), 400
     
@@ -179,10 +169,12 @@ def handle_query():
     
     response_text = tutor_agent(query, history)
     
-    history.append({"sender": "user", "text": query})
-    history.append({"sender": "agent", "text": response_text})
+    updated_history = history + [
+        {"sender": "user", "text": query},
+        {"sender": "agent", "text": response_text}
+    ]
     
-    return jsonify({'response': response_text, 'history': history})
+    return jsonify({'response': response_text, 'history': updated_history})
 
 @app.route('/')
 def serve_index():

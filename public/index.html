@@ -5,82 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Tutor Agent</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
     <style>
-        /* Custom scrollbar for better aesthetics */
-        #messages-container::-webkit-scrollbar {
-            width: 8px;
+        body {
+            font-family: 'Inter', sans-serif;
         }
-        #messages-container::-webkit-scrollbar-track {
-            background: #f1f5f9;
+        #messages-container::-webkit-scrollbar { width: 8px; }
+        #messages-container::-webkit-scrollbar-track { background: #f8fafc; }
+        #messages-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+        #messages-container::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        
+        .message-bubble pre {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            position: relative;
         }
-        #messages-container::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
+        .copy-code-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: #4b5563;
+            color: #e5e7eb;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
-        #messages-container::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+        .message-bubble pre:hover .copy-code-btn {
+            opacity: 1;
         }
+
         .dot-flashing {
             position: relative;
-            width: 8px;
-            height: 8px;
-            border-radius: 5px;
-            background-color: #4f46e5;
-            color: #4f46e5;
+            width: 8px; height: 8px;
+            border-radius: 5px; background-color: #14b8a6;
+            color: #14b8a6;
             animation: dotFlashing 1s infinite linear alternate;
             animation-delay: .5s;
         }
         .dot-flashing::before, .dot-flashing::after {
-            content: '';
-            display: inline-block;
-            position: absolute;
-            top: 0;
+            content: ''; display: inline-block;
+            position: absolute; top: 0;
         }
         .dot-flashing::before {
-            left: -12px;
-            width: 8px;
-            height: 8px;
-            border-radius: 5px;
-            background-color: #4f46e5;
-            color: #4f46e5;
-            animation: dotFlashing 1s infinite alternate;
+            left: -12px; width: 8px; height: 8px;
+            border-radius: 5px; background-color: #14b8a6;
+            color: #14b8a6; animation: dotFlashing 1s infinite alternate;
             animation-delay: 0s;
         }
         .dot-flashing::after {
-            left: 12px;
-            width: 8px;
-            height: 8px;
-            border-radius: 5px;
-            background-color: #4f46e5;
-            color: #4f46e5;
-            animation: dotFlashing 1s infinite alternate;
+            left: 12px; width: 8px; height: 8px;
+            border-radius: 5px; background-color: #14b8a6;
+            color: #14b8a6; animation: dotFlashing 1s infinite alternate;
             animation-delay: 1s;
         }
         @keyframes dotFlashing {
-            0% { background-color: #4f46e5; }
-            50%, 100% { background-color: #c7d2fe; }
+            0% { background-color: #14b8a6; }
+            50%, 100% { background-color: #a7f3d0; }
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
+<body class="bg-slate-100 flex items-center justify-center h-screen">
 
-    <div class="flex flex-col w-full max-w-2xl h-full md:h-[90vh] bg-white shadow-2xl rounded-lg">
-        <header class="bg-indigo-600 text-white p-4 text-center rounded-t-lg shadow-md">
-            <h1 class="text-2xl font-bold">AI Tutor</h1>
-            <p class="text-sm text-indigo-200">Your personal Math & Physics assistant</p>
+    <div class="flex flex-col w-full max-w-3xl h-full md:h-[95vh] bg-white shadow-2xl rounded-lg">
+
+        <header class="bg-gradient-to-r from-teal-500 to-cyan-600 text-white p-4 flex justify-between items-center rounded-t-lg shadow-md">
+            <div>
+                <h1 class="text-2xl font-bold">AI Tutor</h1>
+                <p class="text-sm text-teal-100">Your assistant for Math, Physics, and more!</p>
+            </div>
+            <button id="clear-button" class="bg-white/20 hover:bg-white/30 text-white font-semibold py-2 px-4 rounded-lg transition">Clear</button>
         </header>
 
         <main id="messages-container" class="flex-1 overflow-y-auto p-6 space-y-4">
             <div class="flex justify-start">
-                <div class="max-w-lg px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow">
-                    <p>Hello! Ask me a question about Math or Physics.</p>
+                <div class="message-bubble max-w-lg px-4 py-3 bg-slate-200 text-slate-800 rounded-lg shadow">
+                    <p>Hello! I can help with Math, Physics, and even write some Python code for you. What can I help with today?</p>
                 </div>
             </div>
         </main>
         
         <div id="loading-indicator" class="hidden px-6 pb-2">
              <div class="flex justify-start">
-                <div class="max-w-lg px-4 py-3 bg-gray-200 rounded-lg shadow">
+                <div class="max-w-lg px-4 py-3 bg-slate-200 rounded-lg shadow">
                     <div class="dot-flashing"></div>
                 </div>
             </div>
@@ -88,18 +107,8 @@
 
         <footer class="p-4 bg-white border-t rounded-b-lg">
             <div class="flex items-center">
-                <input
-                    type="text"
-                    id="message-input"
-                    placeholder="Ask a question..."
-                    class="flex-1 p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                />
-                <button
-                    id="send-button"
-                    class="bg-indigo-600 text-white px-6 py-3 rounded-r-lg hover:bg-indigo-700 disabled:bg-indigo-300 transition"
-                >
-                    Send
-                </button>
+                <input type="text" id="message-input" placeholder="Ask a question or request some code..." class="flex-1 p-3 border-2 border-slate-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-teal-500 transition"/>
+                <button id="send-button" class="bg-teal-500 text-white font-bold px-6 py-3 rounded-r-lg hover:bg-teal-600 disabled:bg-teal-300 transition">Send</button>
             </div>
         </footer>
     </div>
@@ -107,31 +116,49 @@
     <script>
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+        const clearButton = document.getElementById('clear-button');
         const messagesContainer = document.getElementById('messages-container');
         const loadingIndicator = document.getElementById('loading-indicator');
-
         const API_ENDPOINT = '/query';
-
         let conversationHistory = [];
 
-        const scrollToBottom = () => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        };
+        const scrollToBottom = () => messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
         const addMessageToUI = (sender, text) => {
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
 
             const messageBubble = document.createElement('div');
-            messageBubble.className = `max-w-lg px-4 py-2 rounded-lg shadow ${
+            messageBubble.className = `message-bubble max-w-2xl px-4 py-2 rounded-lg shadow ${
                 sender === 'user' 
-                ? 'bg-indigo-500 text-white' 
-                : 'bg-gray-200 text-gray-800'
+                ? 'bg-teal-500 text-white' 
+                : 'bg-slate-200 text-slate-800'
             }`;
-            messageBubble.innerText = text;
+            
+            if (sender === 'user') {
+                messageBubble.innerText = text;
+            } else {
+                messageBubble.innerHTML = marked.parse(text);
+            }
 
             messageDiv.appendChild(messageBubble);
             messagesContainer.appendChild(messageDiv);
+            
+            messageBubble.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+                const preElement = block.parentElement;
+                const copyButton = document.createElement('button');
+                copyButton.innerText = 'Copy';
+                copyButton.className = 'copy-code-btn';
+                copyButton.onclick = () => {
+                    navigator.clipboard.writeText(block.innerText).then(() => {
+                        copyButton.innerText = 'Copied!';
+                        setTimeout(() => copyButton.innerText = 'Copy', 2000);
+                    });
+                };
+                preElement.appendChild(copyButton);
+            });
+
             scrollToBottom();
         };
 
@@ -150,28 +177,19 @@
             try {
                 const response = await fetch(API_ENDPOINT, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        query: query,
-                        history: conversationHistory,
-                    }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, history: conversationHistory }),
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
                 const data = await response.json();
-                
                 conversationHistory = data.history;
-
                 addMessageToUI('agent', data.response);
 
             } catch (error) {
                 console.error("Error communicating with the agent:", error);
-                addMessageToUI('agent', 'Sorry, I am having trouble connecting to my brain. Please try again later.');
+                addMessageToUI('agent', 'Sorry, I am having trouble connecting. Please check the backend and try again.');
             } finally {
                 messageInput.disabled = false;
                 sendButton.disabled = false;
@@ -180,15 +198,22 @@
             }
         };
 
+        const clearConversation = () => {
+            conversationHistory = [];
+            messagesContainer.innerHTML = `
+                <div class="flex justify-start">
+                    <div class="message-bubble max-w-lg px-4 py-3 bg-slate-200 text-slate-800 rounded-lg shadow">
+                        <p>Hello! I can help with Math, Physics, and even write some Python code for you. What can I help with today?</p>
+                    </div>
+                </div>`;
+            messageInput.focus();
+        };
+
         sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        messageInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
+        clearButton.addEventListener('click', clearConversation);
         
         messageInput.focus();
-
     </script>
 </body>
 </html>
